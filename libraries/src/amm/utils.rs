@@ -2,7 +2,7 @@ use crate::common;
 use anyhow::Result;
 
 use common::rpc;
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone, Copy, Debug)]
@@ -50,50 +50,58 @@ pub fn get_amm_pda_keys(
     coin_mint: &Pubkey,
     pc_mint: &Pubkey,
 ) -> Result<AmmKeys> {
-    let amm_pool = raydium_amm::processor::get_associated_address_and_bump_seed(
+    let amm_pool =
+        raydium_amm::processor::get_associated_address_and_bump_seed(
+            &amm_program,
+            &market,
+            raydium_amm::processor::AMM_ASSOCIATED_SEED,
+            &amm_program,
+        )
+        .0;
+    let (amm_authority, nonce) = Pubkey::find_program_address(
+        &[raydium_amm::processor::AUTHORITY_AMM],
         &amm_program,
-        &market,
-        raydium_amm::processor::AMM_ASSOCIATED_SEED,
-        &amm_program,
-    )
-    .0;
-    let (amm_authority, nonce) =
-        Pubkey::find_program_address(&[raydium_amm::processor::AUTHORITY_AMM], &amm_program);
-    let amm_open_order = raydium_amm::processor::get_associated_address_and_bump_seed(
-        &amm_program,
-        &market,
-        raydium_amm::processor::OPEN_ORDER_ASSOCIATED_SEED,
-        &amm_program,
-    )
-    .0;
-    let amm_lp_mint = raydium_amm::processor::get_associated_address_and_bump_seed(
-        &amm_program,
-        &market,
-        raydium_amm::processor::LP_MINT_ASSOCIATED_SEED,
-        &amm_program,
-    )
-    .0;
-    let amm_coin_vault = raydium_amm::processor::get_associated_address_and_bump_seed(
-        &amm_program,
-        &market,
-        raydium_amm::processor::COIN_VAULT_ASSOCIATED_SEED,
-        &amm_program,
-    )
-    .0;
-    let amm_pc_vault = raydium_amm::processor::get_associated_address_and_bump_seed(
-        &amm_program,
-        &market,
-        raydium_amm::processor::PC_VAULT_ASSOCIATED_SEED,
-        &amm_program,
-    )
-    .0;
-    let amm_target = raydium_amm::processor::get_associated_address_and_bump_seed(
-        &amm_program,
-        &market,
-        raydium_amm::processor::TARGET_ASSOCIATED_SEED,
-        &amm_program,
-    )
-    .0;
+    );
+    let amm_open_order =
+        raydium_amm::processor::get_associated_address_and_bump_seed(
+            &amm_program,
+            &market,
+            raydium_amm::processor::OPEN_ORDER_ASSOCIATED_SEED,
+            &amm_program,
+        )
+        .0;
+    let amm_lp_mint =
+        raydium_amm::processor::get_associated_address_and_bump_seed(
+            &amm_program,
+            &market,
+            raydium_amm::processor::LP_MINT_ASSOCIATED_SEED,
+            &amm_program,
+        )
+        .0;
+    let amm_coin_vault =
+        raydium_amm::processor::get_associated_address_and_bump_seed(
+            &amm_program,
+            &market,
+            raydium_amm::processor::COIN_VAULT_ASSOCIATED_SEED,
+            &amm_program,
+        )
+        .0;
+    let amm_pc_vault =
+        raydium_amm::processor::get_associated_address_and_bump_seed(
+            &amm_program,
+            &market,
+            raydium_amm::processor::PC_VAULT_ASSOCIATED_SEED,
+            &amm_program,
+        )
+        .0;
+    let amm_target =
+        raydium_amm::processor::get_associated_address_and_bump_seed(
+            &amm_program,
+            &market,
+            raydium_amm::processor::TARGET_ASSOCIATED_SEED,
+            &amm_program,
+        )
+        .0;
 
     Ok(AmmKeys {
         amm_pool,
@@ -111,12 +119,15 @@ pub fn get_amm_pda_keys(
     })
 }
 
-pub fn load_amm_keys(
+pub async fn load_amm_keys(
     client: &RpcClient,
     amm_program: &Pubkey,
     amm_pool: &Pubkey,
 ) -> Result<AmmKeys> {
-    let amm = rpc::get_account::<raydium_amm::state::AmmInfo>(client, &amm_pool)?.unwrap();
+    let amm =
+        rpc::get_account::<raydium_amm::state::AmmInfo>(client, &amm_pool)
+            .await?
+            .unwrap();
     Ok(AmmKeys {
         amm_pool: *amm_pool,
         amm_target: amm.target_orders,
